@@ -1,0 +1,130 @@
+@startuml
+title Рисунок 4.2 — Діаграма класів програмного продукту
+
+skinparam backgroundColor #FAFAFA
+skinparam shadowing false
+skinparam classFontName "DejaVu Sans"
+skinparam class {
+    BorderColor #1F4E79
+    BackgroundColor #DCE6F1
+    HeaderBackgroundColor #BDD7EE
+    AttributeFontColor #1F1F1F
+}
+
+class SOPInstance <<dataclass>> {
+    + n : int
+    + coords : ndarray[n,2]
+    + s : ndarray[2]
+    + chains : List[List[int]]
+    + p : float
+    + X_max : float
+    + Y_max : float
+    + seed : Optional[int]
+    --
+    + D : ndarray[n+1, n+1]
+    + to_dict() : dict
+    + from_dict(d) : SOPInstance
+    - _build_D(v=10.0) : ndarray
+}
+
+class SOPResult <<dataclass>> {
+    + route : List[int]
+    + T : float
+    + t_ms : float
+    + algorithm : str
+    --
+    + to_dict() : dict
+}
+
+class ACOParams <<dataclass>> {
+    + alpha : float
+    + beta : float
+    + rho : float
+    + m_a : Optional[int]
+    + N_iter : int
+    + N_stag : int
+    --
+    + resolve(n) : ACOParams
+}
+
+class GreedySolver <<module: greedy.py>> {
+    + greedy_solve(inst : SOPInstance) : SOPResult
+    - _build_predecessor_lookup(inst)\n     : (rem_pred, succ_list)
+}
+
+class AntColonySolver <<module: aco.py>> {
+    + aco_solve(inst, params, seed) : SOPResult
+    + aco_solve_average(inst, params,\n     R_aco, base_seed) : (best, stats)
+    - _build_one_route(D, tau, ...) : (route, T)
+}
+
+class BruteForceSolver <<module: brute.py>> {
+    + brute_force_solve(inst) : SOPResult
+}
+
+class TaskGenerator <<module: generator.py>> {
+    + generate_instance(n, X_max, Y_max,\n     p, L_min, L_max, seed) : SOPInstance
+}
+
+class ExperimentRunner <<module: experiments.py>> {
+    + experiment_n_stag(...) : List[dict]
+    + experiment_beta(...) : List[dict]
+    + experiment_param_series(name,\n     values, ...) : List[dict]
+    + experiment_n(n_values, ...) : List[dict]
+    - _compute_pair_metrics(T_g, T_a)\n     : (delta, win)
+}
+
+class Visualizer <<module: visualizer.py>> {
+    + visualize_route(inst, result, fname)
+    + plot_calibration_n_stag(rows, fname)
+    + plot_calibration_beta(rows, fname)
+    + plot_param_series(rows, name, fname)
+    + plot_n_series(rows, q_fname,\n     t_fname, gap_fname)
+}
+
+class FileIO <<module: file_io.py>> {
+    + save_instance(inst, path,\n     greedy?, aco?)
+    + load_instance(path) : SOPInstance
+    + save_results_table(rows, path,\n     header)
+}
+
+class CLI <<module: main.py>> {
+    + main()
+    - menu_input_instance(state)
+    - menu_solve(state)
+    - menu_experiments(state)
+    - menu_output(state)
+}
+
+' --- залежності ---
+GreedySolver        ..> SOPInstance       : uses
+GreedySolver        ..> SOPResult         : returns
+
+AntColonySolver     ..> SOPInstance       : uses
+AntColonySolver     ..> ACOParams         : uses
+AntColonySolver     ..> SOPResult         : returns
+AntColonySolver     ..> GreedySolver      : ініціалізація\nτ₀, Q
+
+BruteForceSolver    ..> SOPInstance       : uses
+BruteForceSolver    ..> SOPResult         : returns
+
+TaskGenerator       ..> SOPInstance       : creates
+
+ExperimentRunner    ..> TaskGenerator     : uses
+ExperimentRunner    ..> GreedySolver      : uses
+ExperimentRunner    ..> AntColonySolver   : uses
+ExperimentRunner    ..> BruteForceSolver  : uses
+
+Visualizer          ..> SOPInstance       : uses
+Visualizer          ..> SOPResult         : uses
+
+FileIO              ..> SOPInstance       : (de)serialize
+
+CLI                 ..> TaskGenerator
+CLI                 ..> GreedySolver
+CLI                 ..> AntColonySolver
+CLI                 ..> ExperimentRunner
+CLI                 ..> Visualizer
+CLI                 ..> FileIO
+
+@enduml

@@ -1,0 +1,63 @@
+@startuml
+title Рисунок 4.1 — Схема залежностей модулів програмного продукту
+
+skinparam backgroundColor #FAFAFA
+skinparam shadowing false
+skinparam componentStyle rectangle
+skinparam component {
+    FontName "DejaVu Sans"
+    BorderColor #1F4E79
+    BackgroundColor<<entry>> #BDD7EE
+    BackgroundColor<<io>>    #D9E2F3
+    BackgroundColor<<logic>> #C6E0B4
+    BackgroundColor<<data>>  #FFF2CC
+}
+
+package "Шар вводу-виведення" #EAF1FA {
+  [main.py\nТочка входу / CLI]   as main   <<entry>>
+  [report.py\nВиведення таблиць та логів] as report <<io>>
+  [visualizer.py\nГрафіки matplotlib] as viz <<io>>
+  [file_io.py\nЧитання-запис JSON, PNG] as fio <<io>>
+  [data_types.py\nSOPInstance / SOPResult] as dt <<io>>
+}
+
+package "Шар бізнес-логіки" #EBF7E2 {
+  [generator.py\nГенератор\nіндивідуальних задач] as gen <<logic>>
+  [greedy.py\nЖадібний\nалгоритм]               as greedy <<logic>>
+  [aco.py\nАлгоритм\nмурашиних колоній]         as aco    <<logic>>
+  [brute.py\nПовний перебір\n(n ≤ 10)]          as brute  <<logic>>
+  [experiments.py\nСерії експериментів,\nкалібрування α, β, ρ, L]  as exp <<logic>>
+}
+
+package "Спільні структури даних" #FFF6DA {
+  [numpy.ndarray\nМатриця D, феромон τ,\nrem_pred, succ_list]  as np <<data>>
+}
+
+main   --> report
+main   --> viz
+main   --> fio
+main   --> gen
+main   --> greedy
+main   --> aco
+main   --> exp
+main   --> dt
+
+exp    --> gen
+exp    --> greedy
+exp    --> aco
+exp    --> brute
+
+aco    --> greedy : ініціалізація\nτ₀ та Q
+aco    --> dt
+greedy --> dt
+brute  --> dt
+gen    --> dt
+fio    --> dt
+viz    --> dt
+
+greedy --> np : D, rem_pred,\nsucc_list
+aco    --> np : τ, η, D
+brute  --> np
+gen    --> np : coords
+
+@enduml
