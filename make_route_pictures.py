@@ -38,7 +38,7 @@ def main() -> None:
     print(f"  route_greedy_n8.png  (T = {g8.T:.2f})")
 
     a8, _ = aco_solve_average(
-        inst8, ACOParams(N_iter=100, N_stag=30),
+        inst8, ACOParams(N_iter=10000, N_stag=30),
         R_aco=30, base_seed=0,
     )
     visualize_route(
@@ -59,7 +59,7 @@ def main() -> None:
     print(f"  route_greedy_n30.png (T = {g30.T:.2f})")
 
     a30, _ = aco_solve_average(
-        inst30, ACOParams(N_iter=100, N_stag=30),
+        inst30, ACOParams(N_iter=10000, N_stag=30),
         R_aco=30, base_seed=0,
     )
     visualize_route(

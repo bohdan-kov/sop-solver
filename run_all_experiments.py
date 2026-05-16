@@ -53,10 +53,9 @@ def run_exp1(R: int, R_aco: int) -> None:
     План (підрозділ 3.3.2): n=30, p=0.4, L_min=2, L_max=4,
     π ∈ {5n, 10n, 20n, 50n, 100n} = {150, 300, 600, 1500, 3000}.
 
-    Зауваження: типовий N_iter=100 жорстко обмежить АМК незалежно від Nstag.
-    Для коректного дослідження плато по Nstag тимчасово піднімаємо
-    N_iter до 10000, щоб саме умова "Nstag без поліпшення" керувала
-    зупинкою — тоді крива T̄(π) реально показує насичення.
+    Зауваження: N_iter=10000 виступає як страхувальний ліміт, щоб саме
+    умова "Nstag без поліпшення" керувала зупинкою — тоді крива T̄(π)
+    реально показує насичення замість плоскої лінії на N_iter.
     """
     _section("ЕКСПЕРИМЕНТ 1: калібрування N_stag")
     n = 30
@@ -95,7 +94,7 @@ def run_exp2(R: int, R_aco: int) -> None:
     n = 30
     betas = [0.5, 1.0, 2.0, 3.0, 4.0, 5.0]
     aco_params = ACOParams(alpha=1.0, beta=2.0, rho=0.5,
-                           m_a=None, N_iter=100, N_stag=30)
+                           m_a=None, N_iter=10000, N_stag=30)
 
     _log(f"n={n}, p=0.4, L_min=2, L_max=4, R={R}, R_aco={R_aco}")
     _log(f"β values = {betas}")
@@ -127,7 +126,7 @@ def run_exp3(R: int, R_aco: int) -> None:
     n = 30
     ps = [0.0, 0.2, 0.4, 0.6, 0.8]
     aco_params = ACOParams(alpha=1.0, beta=2.0, rho=0.5,
-                           m_a=None, N_iter=100, N_stag=30)
+                           m_a=None, N_iter=10000, N_stag=30)
 
     _log(f"n={n}, p={ps}, R={R}, R_aco={R_aco}")
     t0 = time.perf_counter()
@@ -189,7 +188,7 @@ def run_exp4(R: int, R_aco: int, full: bool) -> None:
     else:
         ns = [6, 10, 15, 20, 30, 50]
     aco_params = ACOParams(alpha=1.0, beta=2.0, rho=0.5,
-                           m_a=None, N_iter=100, N_stag=30)
+                           m_a=None, N_iter=10000, N_stag=30)
 
     _log(f"n={ns}, p=0.4, L_min=2, L_max=4, R={R}, R_aco={R_aco}")
     t0 = time.perf_counter()

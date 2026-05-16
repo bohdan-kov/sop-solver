@@ -99,7 +99,7 @@ def main() -> None:
         a_best, stats = aco_solve_average(
             inst,
             ACOParams(alpha=1.0, beta=2.0, rho=0.5,
-                      m_a=None, N_iter=100, N_stag=30),
+                      m_a=None, N_iter=10000, N_stag=30),
             R_aco=30,
             base_seed=0,
         )

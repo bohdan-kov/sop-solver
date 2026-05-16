@@ -47,7 +47,7 @@ def experiment_n_stag(
     """
     if aco_params is None:
         aco_params = ACOParams(alpha=1.0, beta=2.0, rho=0.5,
-                               m_a=None, N_iter=100, N_stag=30)
+                               m_a=None, N_iter=10000, N_stag=30)
 
     rows: List[dict] = []
     for pi in pi_values:
@@ -89,7 +89,7 @@ def experiment_beta(
     """Експеримент 2: знайти ефективне β при α = 1."""
     if aco_params is None:
         aco_params = ACOParams(alpha=1.0, beta=2.0, rho=0.5,
-                               m_a=None, N_iter=100, N_stag=30)
+                               m_a=None, N_iter=10000, N_stag=30)
 
     rows: List[dict] = []
     for beta in beta_values:
@@ -137,7 +137,7 @@ def experiment_param_series(
     """
     if aco_params is None:
         aco_params = ACOParams(alpha=1.0, beta=2.0, rho=0.5,
-                               m_a=None, N_iter=100, N_stag=30)
+                               m_a=None, N_iter=10000, N_stag=30)
 
     rows: List[dict] = []
     for v in param_values:
@@ -208,7 +208,7 @@ def experiment_n(
     """
     if aco_params is None:
         aco_params = ACOParams(alpha=1.0, beta=2.0, rho=0.5,
-                               m_a=None, N_iter=100, N_stag=30)
+                               m_a=None, N_iter=10000, N_stag=30)
 
     rows: List[dict] = []
     for n in n_values:

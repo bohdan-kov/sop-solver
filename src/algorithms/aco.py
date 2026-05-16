@@ -8,7 +8,7 @@ from typing import List, Optional
 import numpy as np
 
 from ..data_types import SOPInstance, SOPResult
-from .greedy import greedy_solve, _build_predecessor_lookup
+from .greedy import _build_predecessor_lookup
 
 
 @dataclass
@@ -19,7 +19,7 @@ class ACOParams:
     beta: float = 2.0           # ступінь "жадібності" (евристика)
     rho: float = 0.5            # коефіцієнт випаровування, 0 < rho < 1
     m_a: Optional[int] = None   # кількість мурах; за замовчуванням m_a = n
-    N_iter: int = 100           # максимальна кількість ітерацій
+    N_iter: int = 10000         # максимальна кількість ітерацій (страхувальний ліміт)
     N_stag: int = 30            # ітерацій без поліпшення → стоп
 
     def resolve(self, n: int) -> "ACOParams":
@@ -99,17 +99,18 @@ def aco_solve(
     D = inst.D
     rem_pred_init, succ_list = _build_predecessor_lookup(inst)
 
-    # ініціалізація tau та Q через жадібний маршрут (формули (2.4), (2.5))
-    greedy_res = greedy_solve(inst)
-    T_gr = greedy_res.T
-    tau0 = 1.0 / (n * T_gr) if T_gr > 0 else 1.0
-    Q = T_gr if T_gr > 0 else 1.0
+    # нижня межа T_LB та калібрування tau_0, Q за формулами (2.4)-(2.6)
+    D_off = D.copy()
+    np.fill_diagonal(D_off, np.inf)
+    T_LB = float(D_off.min(axis=1).sum())
+    tau0 = 1.0 / (n * T_LB) if T_LB > 0 else 1.0
+    Q = T_LB if T_LB > 0 else 1.0
 
     tau = np.full((n + 1, n + 1), tau0, dtype=float)
     rng = np.random.default_rng(seed)
 
     best_T = float("inf")
-    best_route: List[int] = greedy_res.route
+    best_route: List[int] = []
     stag = 0
 
     for it in range(p.N_iter):
