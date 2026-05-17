@@ -1,13 +1,17 @@
 """Запуск усіх 4 експериментів послідовно з параметрами з розділу 3.
 
-Параметри відповідають плану в курсовій з адаптацією під реалістичний
-час виконання (R та R_aco зменшено з 30 до 15 для прийнятної тривалості;
-це не міняє якісного характеру висновків).
+Параметри відповідають плану в курсовій:
+  Експ.1-3: R = 30, R_aco = 30;
+  Експ.4:   R = 20, R_aco = 30 (для великих n зменшено через час обчислень,
+            стор. 53);
+  Експ.4:   n ∈ {6, 10, 15, 20, 30, 50, 80, 100} (повна сітка за планом).
 
 Використання:
-    python3 run_all_experiments.py            # повний прогін (~30-60 хв)
+    python3 run_all_experiments.py            # повний прогін за планом
+    python3 run_all_experiments.py --parallel # 4 експерименти паралельно
     python3 run_all_experiments.py --quick    # швидкий smoke-тест (~3 хв)
     python3 run_all_experiments.py --only 1   # тільки експ. 1 (або 2, 3, 4)
+    python3 run_all_experiments.py --quick-n  # Експ.4 без n=80, 100
 """
 from __future__ import annotations
 
@@ -32,18 +36,22 @@ from src.visualizer import (plot_calibration_beta, plot_calibration_n_stag,
 
 RESULTS_DIR = os.path.join(HERE, "results")
 
+# Префікс для логів, який встановлюється у дочірньому процесі при
+# паралельному запуску (напр. "[EXP1] "). У головному процесі — порожній.
+_LOG_PREFIX = ""
+
 
 def _stamp() -> str:
     return datetime.now().strftime("%H:%M:%S")
 
 
 def _log(msg: str) -> None:
-    print(f"[{_stamp()}] {msg}", flush=True)
+    print(f"[{_stamp()}] {_LOG_PREFIX}{msg}", flush=True)
 
 
 def _section(title: str) -> None:
     print("\n" + "=" * 70, flush=True)
-    print(f"[{_stamp()}] {title}", flush=True)
+    print(f"[{_stamp()}] {_LOG_PREFIX}{title}", flush=True)
     print("=" * 70, flush=True)
 
 
@@ -176,13 +184,18 @@ def run_exp3(R: int, R_aco: int) -> None:
 def run_exp4(R: int, R_aco: int, full: bool) -> None:
     """Експеримент 4 (2-в-1). Вплив n на точність та час.
 
-    План (підрозділ 3.3.5): n ∈ {6, 10, 15, 20, 30, 50, 80, 100}.
+    План (підрозділ 3.3.5): n ∈ {6, 10, 15, 20, 30, 50, 80, 100}, R = 20.
     Для n ≤ 10 додатково обчислюється gap відносно brute force.
 
     full=False (швидкий) обрізає до {6, 10, 15, 20, 30, 50}, бо
     n=80,100 коштують десятки хвилин.
     """
     _section("ЕКСПЕРИМЕНТ 4: вплив розмірності n")
+    # Курсова (стор. 53): для Експ.4 R = 20 (для великих n зменшено через
+    # час обчислень). Якщо переданий R більший — приводимо до плану.
+    if R > 20:
+        _log(f"Експ.4: R={R} → 20 (як у плані курсової)")
+        R = 20
     if full:
         ns = [6, 10, 15, 20, 30, 50, 80, 100]
     else:
@@ -214,18 +227,83 @@ def run_exp4(R: int, R_aco: int, full: bool) -> None:
          "exp4_n_time.png, exp4_n_gap.png")
 
 
+def _run_in_process(exp_num: int, R: int, R_aco: int, full_n: bool) -> None:
+    """Точка входу дочірнього процесу — запускає один експеримент.
+
+    Виставляє _LOG_PREFIX = "[EXPn] ", щоб у спільному stdout було видно,
+    рядок якого експерименту куди належить. Оскільки усі експерименти
+    використовують різні бази seed (1000·i, 2000·i, 3000·i, 4000·i) і не
+    діляться станом, результат паралельного запуску ідентичний
+    послідовному до останнього біта.
+    """
+    global _LOG_PREFIX
+    _LOG_PREFIX = f"[EXP{exp_num}] "
+    if exp_num == 1:
+        run_exp1(R, R_aco)
+    elif exp_num == 2:
+        run_exp2(R, R_aco)
+    elif exp_num == 3:
+        run_exp3(R, R_aco)
+    elif exp_num == 4:
+        run_exp4(R, R_aco, full=full_n)
+
+
+def _run_parallel(targets: list[int], R: int, R_aco: int,
+                  full_n: bool) -> None:
+    """Запускає вибрані експерименти у паралельних процесах."""
+    import multiprocessing as mp
+    ctx = mp.get_context("spawn")
+    procs: list[tuple[int, mp.Process]] = []
+    for exp_num in targets:
+        p = ctx.Process(
+            target=_run_in_process,
+            args=(exp_num, R, R_aco, full_n),
+            name=f"exp{exp_num}",
+        )
+        p.start()
+        procs.append((exp_num, p))
+        _log(f"Запущено EXP{exp_num} у процесі PID={p.pid}")
+
+    failed: list[int] = []
+    try:
+        for exp_num, p in procs:
+            p.join()
+            if p.exitcode == 0:
+                _log(f"EXP{exp_num} завершено успішно")
+            else:
+                failed.append(exp_num)
+                _log(f"EXP{exp_num} впав з exitcode={p.exitcode}")
+    except KeyboardInterrupt:
+        _log("Перервано користувачем — зупиняю дочірні процеси...")
+        for _, p in procs:
+            if p.is_alive():
+                p.terminate()
+        for _, p in procs:
+            p.join(timeout=5)
+        sys.exit(130)
+
+    if failed:
+        _log(f"Падіння у експериментах: {failed}")
+        sys.exit(1)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Запуск усіх експериментів")
     ap.add_argument("--quick", action="store_true",
                     help="швидкий smoke-тест з мінімальними R, R_aco")
     ap.add_argument("--only", type=int, choices=[1, 2, 3, 4],
                     help="запустити тільки один експеримент")
-    ap.add_argument("--full-n", action="store_true",
-                    help="для експ. 4 використати n до 100 (повільно)")
-    ap.add_argument("--R", type=int, default=15,
-                    help="кількість задач у наборі (за замовч. 15)")
-    ap.add_argument("--R-aco", type=int, default=15,
-                    help="кількість прогонів АМК на задачі (за замовч. 15)")
+    ap.add_argument("--quick-n", action="store_true",
+                    help="для експ. 4 виключити n=80, 100 (швидше)")
+    ap.add_argument("--R", type=int, default=30,
+                    help="кількість задач у наборі (за замовч. 30; "
+                         "для Експ.4 автоматично обмежується до 20)")
+    ap.add_argument("--R-aco", type=int, default=30,
+                    help="кількість прогонів АМК на задачі (за замовч. 30)")
+    ap.add_argument("--parallel", action="store_true",
+                    help="запустити усі 4 експерименти паралельно у "
+                         "окремих процесах (результати ідентичні "
+                         "послідовним; ефективно при 4+ ядрах CPU)")
     args = ap.parse_args()
 
     if args.quick:
@@ -233,25 +311,24 @@ def main() -> None:
         full_n = False
     else:
         R, R_aco = args.R, args.R_aco
-        full_n = args.full_n
+        full_n = not args.quick_n
 
     os.makedirs(RESULTS_DIR, exist_ok=True)
     _log(f"Старт запуску експериментів. R={R}, R_aco={R_aco}, "
-         f"full_n={full_n}, only={args.only}")
+         f"full_n={full_n}, only={args.only}, parallel={args.parallel}")
     t_total = time.perf_counter()
 
-    try:
-        if args.only in (None, 1):
-            run_exp1(R, R_aco)
-        if args.only in (None, 2):
-            run_exp2(R, R_aco)
-        if args.only in (None, 3):
-            run_exp3(R, R_aco)
-        if args.only in (None, 4):
-            run_exp4(R, R_aco, full=full_n)
-    except KeyboardInterrupt:
-        _log("Перервано користувачем.")
-        sys.exit(130)
+    targets = [args.only] if args.only else [1, 2, 3, 4]
+
+    if args.parallel and len(targets) > 1:
+        _run_parallel(targets, R, R_aco, full_n)
+    else:
+        try:
+            for exp_num in targets:
+                _run_in_process(exp_num, R, R_aco, full_n)
+        except KeyboardInterrupt:
+            _log("Перервано користувачем.")
+            sys.exit(130)
 
     _log(f"УСІ ЕКСПЕРИМЕНТИ ЗАВЕРШЕНО за "
          f"{(time.perf_counter() - t_total) / 60:.1f} хв")
