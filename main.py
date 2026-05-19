@@ -105,14 +105,31 @@ def _input_generate(state: dict) -> None:
         L_max = int(input("Введіть максимальну довжину ланцюжка L_max (рекомендовано 4): "))
         seed_str = input("Введіть зерно генератора seed (рекомендовано 42): ")
         seed = int(seed_str) if seed_str.strip() else None
+        intersect_str = input(
+            "Дозволити перетин ланцюжків (одна позиція може бути "
+            "в декількох ланцюжках)? (так/ні) [за замовч. ні]: "
+        ).strip().lower()
+        allow_intersection = intersect_str in ("так", "yes", "y", "т")
 
         inst = generate_instance(
             n=n, X_max=X_max, Y_max=Y_max, p=p,
             L_min=L_min, L_max=L_max, seed=seed,
+            allow_intersection=allow_intersection,
         )
         state["instance"] = inst
 
-        print(f"\nЗгенеровано задачу: n={n}, p={p}. З ланцюжками.")
+        total_in_chains = sum(len(c) for c in inst.chains)
+        distinct_in_chains = len({v for c in inst.chains for v in c})
+        n_overlaps = total_in_chains - distinct_in_chains
+        if allow_intersection:
+            mode_msg = f", з перетинами (позицій-перетинів: {n_overlaps})"
+        else:
+            mode_msg = ", без перетинів"
+        print(f"\nЗгенеровано задачу: n={n}, p={p}, "
+              f"ланцюжків: {len(inst.chains)}{mode_msg}.")
+        if inst.chains:
+            for i, c in enumerate(inst.chains, 1):
+                print(f"  P{i}: " + " → ".join(str(v) for v in c))
         save_q = input("\nЗберегти задачу у файл? (так/ні): ").strip().lower()
         if save_q in ("так", "yes", "y", "т"):
             default = f"task_n{n}.json"
